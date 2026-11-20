@@ -1,31 +1,108 @@
+
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>J.A.R.V.I.S</title>
-<link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#02090e">
+  <title>J.A.R.V.I.S AI</title>
+  <link rel="stylesheet" href="./style.css?v=3">
 </head>
 <body>
- <header><h1>J.A.R.V.I.S</h1><p>MOBILE EDITION</p></header>
- <div class="core">
- <div class="ring r1"></div>
- <div class="ring r2"></div>
- <div class="center"></div>
- </div>
- <p class="core-text">CORE ACTIVE</p>
- <div class="status">
- <h2>SYSTEM STATUS</h2>
- <div class="row"><span>AI CORE</span><b class="on">● ONLINE</b></div>
- <div class="row"><span>NETWORK</span><b class="on">● ONLINE</b></div>
- <div class="row"><span>VOICE</span><b class="off">○ LOCKED</b></div>
- <div class="row"><span>MEMORY</span><b class="off">○ LOCKED</b></div>
- </div>
- <div class="chat" id="chat"></div>
- <div class="input-area">
- <input id="msg" placeholder="Ask J.A.R.V.I.S...">
- <button id="send">SEND</button>
- </div>
- <script src="script.js"></script>
+
+  <div class="app">
+    <header>
+      <div class="brand">
+        <div class="brand-icon">J</div>
+        <div>
+          <h1>J.A.R.V.I.S</h1>
+          <p>JUST A RATHER VERY INTELLIGENT SYSTEM</p>
+        </div>
+      </div>
+      <div class="system-pill">
+        <span class="pulse"></span>
+        SYSTEM READY
+      </div>
+    </header>
+
+    <main>
+      <section class="core-section">
+        <div class="core">
+          <div class="ring ring-one"></div>
+          <div class="ring ring-two"></div>
+          <div class="ring ring-three"></div>
+          <div class="core-center">
+            <span>J</span>
+            <small>AI CORE</small>
+          </div>
+        </div>
+        <h2>CORE ACTIVE</h2>
+        <p class="subtitle">PERSONAL AI ASSISTANT</p>
+      </section>
+
+      <section class="status-panel">
+        <h2> SYSTEM STATUS</h2>
+        <div class="status-row">
+          <span>AI BRAIN</span>
+          <strong id="brainStatus">NOT CONNECTED</strong>
+        </div>
+        <div class="status-row">
+          <span>NETWORK</span>
+          <strong id="networkStatus">READY</strong>
+        </div>
+        <div class="status-row">
+          <span>VOICE</span>
+          <strong id="voiceStatus">CHECKING</strong>
+        </div>
+        <div class="status-row">
+          <span>MEMORY</span>
+          <strong class="online">LOCAL ACTIVE</strong>
+        </div>
+      </section>
+
+      <section class="settings">
+        <h2>AI CONNECTION</h2>
+        <p>Enter your Gemini API key privately on this device.</p>
+        <div class="key-row">
+          <input id="apiKey" type="password"
+            placeholder="Paste your Gemini API key">
+          <button id="toggleKey" class="small-button">SHOW</button>
+        </div>
+        <div class="settings-actions">
+          <button id="saveKey" class="primary-button">SAVE KEY</button>
+          <button id="removeKey" class="secondary-button">REMOVE</button>
+        </div>
+        <p id="keyMessage" class="hint">API key not saved yet.</p>
+      </section>
+
+      <section class="chat-section">
+        <div class="chat-heading">
+          <h2>J.A.R.V.I.S CHAT</h2>
+          <button id="clearChat" class="small-button">CLEAR</button>
+        </div>
+
+        <div id="chat" class="chat">
+          <div class="message bot">
+            <span class="sender">J.A.R.V.I.S</span>
+            Hello! I am online. Save your Gemini API key to connect my AI brain.
+          </div>
+        </div>
+
+        <div class="input-area">
+          <input id="messageInput" type="text"
+            placeholder="Ask me anything..." autocomplete="off">
+          <button id="voiceButton" class="voice-button"
+            title="Voice input">🎙</button>
+          <button id="sendButton" class="send-button">SEND</button>
+        </div>
+        <p id="activity" class="hint">SYSTEM WAITING FOR COMMAND</p>
+      </section>
+    </main>
+
+    <footer>J.A.R.V.I.S AI · MOBILE EDITION</footer>
+  </div>
+
+  <script src="./script.js?v=3"></script>
 </body>
 </html>
+
