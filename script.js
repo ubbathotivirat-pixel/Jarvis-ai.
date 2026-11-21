@@ -1,345 +1,186 @@
-/* =====================================
-   J.A.R.V.I.S AI - GEMINI CONNECTION
-   ===================================== */
 
-const API_URL =
-  "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
-
+const API_URL = "https://generativelanguage.googleapis.com/v1beta/interactions";
+const MODEL = "gemini-3.8-flash";
 const KEY_NAME = "jarvis_gemini_api_key";
 
-const $ = (id) => document.getElementById(id);
+const apiKey = document.getElementById("apiKey");
+const chat = document.getElementById("chat");
+const messageInput = document.getElementById("messageInput");
 
-const apiKeyInput = $("apiKey");
-const brainStatus = $("brainStatus");
-const networkStatus = $("networkStatus");
-const voiceStatus = $("voiceStatus");
-const keyMessage = $("keyMessage");
-const chat = $("chat");
-const messageInput = $("messageInput");
-const activity = $("activity");
-
-let busy = false;
-let conversation = [];
-
-/* STATUS */
-
-function status(element, value, online) {
-  if (!element) return;
-
-  element.textContent = value;
-  element.classList.toggle("online", online);
-  element.classList.toggle("offline", !online);
+function status(id, message) {
+  const element = document.getElementById(id);
+  if (element) element.textContent = message;
 }
 
 function getKey() {
   return localStorage.getItem(KEY_NAME) || "";
 }
 
-function setActivity(value) {
-  if (activity) activity.textContent = value;
-}
-
-/* CHAT DISPLAY */
-
-function addMessage(message, sender = "bot") {
-  const box = document.createElement("div");
-  box.className = "message " + sender;
-
-  const name = document.createElement("span");
-  name.className = "sender";
-  name.textContent =
-    sender === "bot" ? "J.A.R.V.I.S" : "YOU";
-
-  const text = document.createElement("div");
-  text.textContent = message;
-
-  box.appendChild(name);
-  box.appendChild(text);
-
-  chat.appendChild(box);
+function addMessage(sender, message) {
+  const p = document.createElement("p");
+  p.textContent = sender + ": " + message;
+  chat.appendChild(p);
   chat.scrollTop = chat.scrollHeight;
 }
-
-/* GEMINI CONNECTION */
 
 async function askGemini(prompt) {
   const key = getKey();
 
   if (!key) {
-    throw new Error("Please save your Gemini API key.");
+    throw new Error("Please save your Gemini API key first.");
   }
 
-  const contents = [
-    ...conversation,
-    {
-      role: "user",
-      parts: [{ text: prompt }]
-    }
-  ];
-
-  const response = await fetch(
-    API_URL + "?key=" + encodeURIComponent(key),
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        system_instruction: {
-          parts: [{
-            text: "You are J.A.R.V.I.S, a helpful intelligent personal AI assistant. Answer clearly and politely."
-          }]
-        },
-        contents: contents,
-        generationConfig: {
-          temperature: 0.7,
-          maxOutputTokens: 1024
-        }
-      })
-    }
-  );
+  const response = await fetch(API_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-goog-api-key": key,
+      "Api-Revision": "2026-05-20"
+    },
+    body: JSON.stringify({
+      model: MODEL,
+      input: "You are J.A.R.V.I.S, a helpful personal AI assistant. Reply clearly and naturally. User says: " + prompt,
+      store: false
+    })
+  });
 
   const data = await response.json();
 
   if (!response.ok) {
-    throw new Error(
-      data.error?.message || "Gemini API error " + response.status
-    );
+    throw new Error(data.error?.message || "Gemini connection failed.");
   }
 
-  const answer =
-    data.candidates?.[0]?.content?.parts
-      ?.map(part => part.text || "")
-      .join("")
-      .trim();
+  if (data.output_text) return data.output_text;
 
-  if (!answer) {
-    throw new Error("Gemini returned no text.");
+  const output = (data.steps || [])
+    .filter(step => step.type === "model_output")
+    .flatMap(step => step.content || [])
+    .filter(item => item.type === "text")
+    .map(item => item.text)
+    .join("");
+
+  if (!output) {
+    throw new Error("Gemini returned no text response.");
   }
 
-  conversation.push(
-    { role: "user", parts: [{ text: prompt }] },
-    { role: "model", parts: [{ text: answer }] }
-  );
-
-  if (conversation.length > 20) {
-    conversation = conversation.slice(-20);
-  }
-
-  return answer;
+  return output;
 }
 
-/* TEST CONNECTION */
-
-async function testConnection() {
-  status(brainStatus, "CONNECTING...", false);
-  setActivity("TESTING GEMINI CONNECTION...");
-
-  try {
-    await askGemini("Reply with exactly: JARVIS ONLINE");
-
-    conversation = [];
-
-    status(brainStatus, "CONNECTED", true);
-    status(networkStatus, "ONLINE", true);
-
-    keyMessage.textContent =
-      "API key saved. Gemini connected!";
-
-    setActivity("J.A.R.V.I.S READY");
-
-    return true;
-
-  } catch (error) {
-    status(brainStatus, "NOT CONNECTED", false);
-
-    keyMessage.textContent =
-      "ERROR: " + error.message;
-
-    setActivity("CONNECTION FAILED");
-
-    return false;
-  }
-}
-
-/* SAVE KEY */
-
-$("saveKey").addEventListener("click", async () => {
-  const key = apiKeyInput.value.trim();
+// SAVE API KEY
+document.getElementById("saveKey").addEventListener("click", async () => {
+  const key = apiKey.value.trim();
 
   if (!key) {
-    keyMessage.textContent = "Enter your Gemini API key.";
+    status("keyMessage", "Please enter your API key.");
     return;
   }
 
-  if (busy) return;
-
   localStorage.setItem(KEY_NAME, key);
-
-  conversation = [];
-
-  keyMessage.textContent = "Key saved. Testing...";
-
+  status("keyMessage", "Testing Gemini connection...");
   await testConnection();
 });
 
-/* REMOVE KEY */
-
-$("removeKey").addEventListener("click", () => {
+// REMOVE API KEY
+document.getElementById("removeKey").addEventListener("click", () => {
   localStorage.removeItem(KEY_NAME);
-
-  apiKeyInput.value = "";
-  conversation = [];
-
-  status(brainStatus, "NOT CONNECTED", false);
-
-  keyMessage.textContent = "API key removed.";
-
-  setActivity("WAITING FOR API KEY");
+  apiKey.value = "";
+  status("keyMessage", "API key removed.");
+  status("brainStatus", "AI BRAIN: NOT CONNECTED");
 });
 
-/* SHOW / HIDE KEY */
-
-$("toggleKey").addEventListener("click", () => {
-  const hidden = apiKeyInput.type === "password";
-
-  apiKeyInput.type = hidden ? "text" : "password";
-
-  $("toggleKey").textContent = hidden ? "HIDE" : "SHOW";
+// SHOW / HIDE KEY
+document.getElementById("toggleKey").addEventListener("click", () => {
+  apiKey.type = apiKey.type === "password" ? "text" : "password";
 });
 
-/* SEND MESSAGE */
-
-async function sendMessage() {
-  const prompt = messageInput.value.trim();
-
-  if (!prompt || busy) return;
-
-  if (!getKey()) {
-    addMessage("Please save your Gemini API key first.");
-    return;
-  }
-
-  busy = true;
-
-  messageInput.value = "";
-
-  addMessage(prompt, "user");
-
-  $("sendButton").disabled = true;
-  $("sendButton").textContent = "WAIT";
-
-  setActivity("J.A.R.V.I.S THINKING...");
-
+// TEST CONNECTION
+async function testConnection() {
   try {
-    const answer = await askGemini(prompt);
+    status("brainStatus", "AI BRAIN: CONNECTING");
 
-    addMessage(answer, "bot");
+    const answer = await askGemini("Reply only: JARVIS ONLINE.");
 
-    status(brainStatus, "CONNECTED", true);
-
-    setActivity("RESPONSE RECEIVED");
-
-    if ("speechSynthesis" in window) {
-      window.speechSynthesis.cancel();
-
-      const speech = new SpeechSynthesisUtterance(answer);
-      speech.lang = "en-IN";
-
-      window.speechSynthesis.speak(speech);
-    }
+    status("brainStatus", "AI BRAIN: CONNECTED");
+    status("keyMessage", "SUCCESS: " + answer);
 
   } catch (error) {
-    addMessage("ERROR: " + error.message);
-
-    status(brainStatus, "NOT CONNECTED", false);
-
-    setActivity("COMMAND FAILED");
-
-  } finally {
-    busy = false;
-
-    $("sendButton").disabled = false;
-    $("sendButton").textContent = "SEND";
+    status("brainStatus", "AI BRAIN: NOT CONNECTED");
+    status("keyMessage", "ERROR: " + error.message);
   }
 }
 
-$("sendButton").addEventListener("click", sendMessage);
+// SEND MESSAGE
+async function sendMessage() {
+  const prompt = messageInput.value.trim();
+
+  if (!prompt) return;
+
+  messageInput.value = "";
+  addMessage("YOU", prompt);
+  status("activity", "JARVIS IS THINKING...");
+
+  try {
+    const answer = await askGemini(prompt);
+    addMessage("J.A.R.V.I.S", answer);
+    status("activity", "SYSTEM READY");
+
+    if ("speechSynthesis" in window) {
+      speechSynthesis.cancel();
+      const speech = new SpeechSynthesisUtterance(answer);
+      speechSynthesis.speak(speech);
+    }
+
+  } catch (error) {
+    addMessage("ERROR", error.message);
+    status("activity", "CONNECTION ERROR");
+  }
+}
+
+document.getElementById("sendButton")
+  .addEventListener("click", sendMessage);
 
 messageInput.addEventListener("keydown", event => {
   if (event.key === "Enter") sendMessage();
 });
 
-/* CLEAR CHAT */
-
-$("clearChat").addEventListener("click", () => {
+// CLEAR CHAT
+document.getElementById("clearChat").addEventListener("click", () => {
   chat.innerHTML = "";
-  conversation = [];
-
-  addMessage("Chat cleared. I am ready.");
-
-  setActivity("SYSTEM READY");
 });
 
-/* VOICE INPUT */
+// VOICE INPUT
+document.getElementById("voiceButton").addEventListener("click", () => {
+  const SpeechRecognition =
+    window.SpeechRecognition || window.webkitSpeechRecognition;
 
-const Recognition =
-  window.SpeechRecognition ||
-  window.webkitSpeechRecognition;
+  if (!SpeechRecognition) {
+    addMessage("J.A.R.V.I.S", "Voice recognition is not supported here.");
+    return;
+  }
 
-if (Recognition) {
-  const recognition = new Recognition();
-
+  const recognition = new SpeechRecognition();
   recognition.lang = "en-IN";
-  recognition.continuous = false;
-
-  voiceStatus.textContent = "AVAILABLE";
-
-  $("voiceButton").addEventListener("click", () => {
-    try {
-      recognition.start();
-      setActivity("LISTENING...");
-    } catch (error) {
-      setActivity("VOICE ALREADY ACTIVE");
-    }
-  });
+  recognition.start();
 
   recognition.onresult = event => {
-    messageInput.value =
-      event.results[0][0].transcript;
-
+    messageInput.value = event.results[0][0].transcript;
     sendMessage();
   };
 
   recognition.onerror = () => {
-    setActivity("VOICE INPUT ERROR");
+    status("activity", "VOICE RECOGNITION ERROR");
   };
-
-} else {
-  voiceStatus.textContent = "UNAVAILABLE";
-}
-
-/* STARTUP */
-
-window.addEventListener("load", async () => {
-  status(networkStatus, "ONLINE", true);
-
-  if (Recognition && voiceStatus) {
-    voiceStatus.textContent = "AVAILABLE";
-  } else if (voiceStatus) {
-    voiceStatus.textContent = "UNAVAILABLE";
-  }
-
-  if (getKey()) {
-    apiKeyInput.value = getKey();
-
-    keyMessage.textContent = "Checking saved API key...";
-
-    await testConnection();
-
-  } else {
-    status(brainStatus, "NOT CONNECTED", false);
-
-    keyMessage.textContent = "API key not saved yet.";
-  }
 });
+
+// STARTUP
+apiKey.value = getKey();
+
+status("networkStatus", navigator.onLine
+  ? "NETWORK: ONLINE"
+  : "NETWORK: OFFLINE");
+
+if (getKey()) {
+  testConnection();
+} else {
+  status("brainStatus", "AI BRAIN: NOT CONNECTED");
+}
