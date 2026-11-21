@@ -1,296 +1,345 @@
+/* =====================================
+   J.A.R.V.I.S AI - GEMINI CONNECTION
+   ===================================== */
+
+const API_URL =
+  "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
+
+const KEY_NAME = "jarvis_gemini_api_key";
+
 const $ = (id) => document.getElementById(id);
 
 const apiKeyInput = $("apiKey");
-const chatBox = $("chat");
+const brainStatus = $("brainStatus");
+const networkStatus = $("networkStatus");
+const voiceStatus = $("voiceStatus");
+const keyMessage = $("keyMessage");
+const chat = $("chat");
 const messageInput = $("messageInput");
-const sendButton = $("sendButton");
+const activity = $("activity");
 
-const API_URL =
-  "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent";
-
-const KEY_NAME = "jarvis_gemini_key";
-const HISTORY_NAME = "jarvis_chat_history";
-
-let conversation = [];
 let busy = false;
+let conversation = [];
 
-// Load saved settings and conversation
-try {
-  apiKeyInput.value = localStorage.getItem(KEY_NAME) || "";
-  conversation = JSON.parse(
-    localStorage.getItem(HISTORY_NAME) || "[]"
-  );
+/* STATUS */
 
-  if (!Array.isArray(conversation)) conversation = [];
-} catch {
-  conversation = [];
+function status(element, value, online) {
+  if (!element) return;
+
+  element.textContent = value;
+  element.classList.toggle("online", online);
+  element.classList.toggle("offline", !online);
 }
 
-function setStatus(id, message, good = false) {
-  const element = $(id);
-  element.textContent = message;
-  element.className = good ? "online" : "";
+function getKey() {
+  return localStorage.getItem(KEY_NAME) || "";
 }
 
-function addMessage(text, sender) {
-  const message = document.createElement("div");
-  message.className = "message " + sender;
-
-  const label = document.createElement("span");
-  label.className = "sender";
-  label.textContent =
-    sender === "user" ? "YOU" : "J.A.R.V.I.S";
-
-  const content = document.createElement("div");
-  content.textContent = text;
-
-  message.append(label, content);
-  chatBox.appendChild(message);
-  chatBox.scrollTop = chatBox.scrollHeight;
+function setActivity(value) {
+  if (activity) activity.textContent = value;
 }
 
-function saveHistory() {
-  try {
-    conversation = conversation.slice(-16);
-    localStorage.setItem(
-      HISTORY_NAME,
-      JSON.stringify(conversation)
-    );
-  } catch {
-    $("activity").textContent = "MEMORY STORAGE UNAVAILABLE";
-  }
+/* CHAT DISPLAY */
+
+function addMessage(message, sender = "bot") {
+  const box = document.createElement("div");
+  box.className = "message " + sender;
+
+  const name = document.createElement("span");
+  name.className = "sender";
+  name.textContent =
+    sender === "bot" ? "J.A.R.V.I.S" : "YOU";
+
+  const text = document.createElement("div");
+  text.textContent = message;
+
+  box.appendChild(name);
+  box.appendChild(text);
+
+  chat.appendChild(box);
+  chat.scrollTop = chat.scrollHeight;
 }
 
-function showSavedConversation() {
-  chatBox.innerHTML = "";
+/* GEMINI CONNECTION */
 
-  if (conversation.length === 0) {
-    addMessage(
-      "Hello! I am ready. Save your Gemini API key to connect my AI brain.",
-      "bot"
-    );
-    return;
-  }
-
-  conversation.forEach(item => {
-    const text = item.parts?.[0]?.text || "";
-    addMessage(text, item.role === "user" ? "user" : "bot");
-  });
-}
-
-showSavedConversation();
-
-// Save API key only in this browser on this device
-$("saveKey").addEventListener("click", () => {
-  const key = apiKeyInput.value.trim();
+async function askGemini(prompt) {
+  const key = getKey();
 
   if (!key) {
-    $("keyMessage").textContent = "Please enter your API key.";
-    return;
+    throw new Error("Please save your Gemini API key.");
   }
 
-  try {
-    localStorage.setItem(KEY_NAME, key);
-    $("keyMessage").textContent = "API key saved on this device.";
-    setStatus("brainStatus", "KEY SAVED", true);
-  } catch {
-    $("keyMessage").textContent = "Could not save the key.";
-  }
-});
+  const contents = [
+    ...conversation,
+    {
+      role: "user",
+      parts: [{ text: prompt }]
+    }
+  ];
 
-$("removeKey").addEventListener("click", () => {
-  localStorage.removeItem(KEY_NAME);
-  apiKeyInput.value = "";
-  $("keyMessage").textContent = "API key removed.";
-  setStatus("brainStatus", "NOT CONNECTED");
-});
-
-$("toggleKey").addEventListener("click", () => {
-  const hidden = apiKeyInput.type === "password";
-  apiKeyInput.type = hidden ? "text" : "password";
-  $("toggleKey").textContent = hidden ? "HIDE" : "SHOW";
-});
-
-// Test connection using a real Gemini request
-async function sendMessage() {
-  const text = messageInput.value.trim();
-
-  if (!text || busy) return;
-
-  const apiKey = localStorage.getItem(KEY_NAME);
-
-  if (!apiKey) {
-    addMessage(
-      "Please save your Gemini API key in the AI CONNECTION section first.",
-      "bot"
-    );
-    $("activity").textContent = "API KEY REQUIRED";
-    return;
-  }
-
-  busy = true;
-  sendButton.disabled = true;
-  sendButton.textContent = "...";
-
-  messageInput.value = "";
-  addMessage(text, "user");
-
-  conversation.push({
-    role: "user",
-    parts: [{ text }]
-  });
-
-  $("activity").textContent = "J.A.R.V.I.S IS THINKING...";
-  setStatus("brainStatus", "CONNECTING");
-
-  try {
-    const response = await fetch(API_URL, {
+  const response = await fetch(
+    API_URL + "?key=" + encodeURIComponent(key),
+    {
       method: "POST",
       headers: {
-        "Content-Type": "application/json",
-        "x-goog-api-key": apiKey
+        "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        systemInstruction: {
+        system_instruction: {
           parts: [{
-            text:
-              "You are J.A.R.V.I.S, a helpful, intelligent, polite " +
-              "personal AI assistant. Give clear and accurate answers. " +
-              "Never claim to control a device or perform an action " +
-              "unless an actual tool has done it."
+            text: "You are J.A.R.V.I.S, a helpful intelligent personal AI assistant. Answer clearly and politely."
           }]
         },
-        contents: conversation.slice(-16),
+        contents: contents,
         generationConfig: {
           temperature: 0.7,
           maxOutputTokens: 1024
         }
       })
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      const errorText =
-        data.error?.message || "Gemini API request failed.";
-
-      throw new Error(
-        "HTTP " + response.status + ": " + errorText
-      );
     }
+  );
 
-    const answer =
-      data.candidates?.[0]?.content?.parts
-        ?.map(part => part.text || "")
-        .join("")
-        .trim();
+  const data = await response.json();
 
-    if (!answer) {
-      throw new Error("Gemini returned an empty response.");
-    }
+  if (!response.ok) {
+    throw new Error(
+      data.error?.message || "Gemini API error " + response.status
+    );
+  }
 
-    conversation.push({
-      role: "model",
-      parts: [{ text: answer }]
-    });
+  const answer =
+    data.candidates?.[0]?.content?.parts
+      ?.map(part => part.text || "")
+      .join("")
+      .trim();
 
-    saveHistory();
-    addMessage(answer, "bot");
+  if (!answer) {
+    throw new Error("Gemini returned no text.");
+  }
 
-    setStatus("brainStatus", "ONLINE", true);
-    $("activity").textContent = "RESPONSE RECEIVED";
+  conversation.push(
+    { role: "user", parts: [{ text: prompt }] },
+    { role: "model", parts: [{ text: answer }] }
+  );
+
+  if (conversation.length > 20) {
+    conversation = conversation.slice(-20);
+  }
+
+  return answer;
+}
+
+/* TEST CONNECTION */
+
+async function testConnection() {
+  status(brainStatus, "CONNECTING...", false);
+  setActivity("TESTING GEMINI CONNECTION...");
+
+  try {
+    await askGemini("Reply with exactly: JARVIS ONLINE");
+
+    conversation = [];
+
+    status(brainStatus, "CONNECTED", true);
+    status(networkStatus, "ONLINE", true);
+
+    keyMessage.textContent =
+      "API key saved. Gemini connected!";
+
+    setActivity("J.A.R.V.I.S READY");
+
+    return true;
 
   } catch (error) {
-    console.error("JARVIS error:", error);
+    status(brainStatus, "NOT CONNECTED", false);
 
-    // Remove the unanswered user message from stored history
-    conversation.pop();
-    saveHistory();
+    keyMessage.textContent =
+      "ERROR: " + error.message;
 
-    addMessage("Connection error: " + error.message, "bot");
-    setStatus("brainStatus", "ERROR");
-    $("activity").textContent = "CONNECTION FAILED";
+    setActivity("CONNECTION FAILED");
+
+    return false;
+  }
+}
+
+/* SAVE KEY */
+
+$("saveKey").addEventListener("click", async () => {
+  const key = apiKeyInput.value.trim();
+
+  if (!key) {
+    keyMessage.textContent = "Enter your Gemini API key.";
+    return;
+  }
+
+  if (busy) return;
+
+  localStorage.setItem(KEY_NAME, key);
+
+  conversation = [];
+
+  keyMessage.textContent = "Key saved. Testing...";
+
+  await testConnection();
+});
+
+/* REMOVE KEY */
+
+$("removeKey").addEventListener("click", () => {
+  localStorage.removeItem(KEY_NAME);
+
+  apiKeyInput.value = "";
+  conversation = [];
+
+  status(brainStatus, "NOT CONNECTED", false);
+
+  keyMessage.textContent = "API key removed.";
+
+  setActivity("WAITING FOR API KEY");
+});
+
+/* SHOW / HIDE KEY */
+
+$("toggleKey").addEventListener("click", () => {
+  const hidden = apiKeyInput.type === "password";
+
+  apiKeyInput.type = hidden ? "text" : "password";
+
+  $("toggleKey").textContent = hidden ? "HIDE" : "SHOW";
+});
+
+/* SEND MESSAGE */
+
+async function sendMessage() {
+  const prompt = messageInput.value.trim();
+
+  if (!prompt || busy) return;
+
+  if (!getKey()) {
+    addMessage("Please save your Gemini API key first.");
+    return;
+  }
+
+  busy = true;
+
+  messageInput.value = "";
+
+  addMessage(prompt, "user");
+
+  $("sendButton").disabled = true;
+  $("sendButton").textContent = "WAIT";
+
+  setActivity("J.A.R.V.I.S THINKING...");
+
+  try {
+    const answer = await askGemini(prompt);
+
+    addMessage(answer, "bot");
+
+    status(brainStatus, "CONNECTED", true);
+
+    setActivity("RESPONSE RECEIVED");
+
+    if ("speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+
+      const speech = new SpeechSynthesisUtterance(answer);
+      speech.lang = "en-IN";
+
+      window.speechSynthesis.speak(speech);
+    }
+
+  } catch (error) {
+    addMessage("ERROR: " + error.message);
+
+    status(brainStatus, "NOT CONNECTED", false);
+
+    setActivity("COMMAND FAILED");
 
   } finally {
     busy = false;
-    sendButton.disabled = false;
-    sendButton.textContent = "SEND";
-    messageInput.focus();
+
+    $("sendButton").disabled = false;
+    $("sendButton").textContent = "SEND";
   }
 }
 
-sendButton.addEventListener("click", sendMessage);
+$("sendButton").addEventListener("click", sendMessage);
 
 messageInput.addEventListener("keydown", event => {
-  if (event.key === "Enter") {
-    sendMessage();
-  }
+  if (event.key === "Enter") sendMessage();
 });
 
-// Clear conversation memory
+/* CLEAR CHAT */
+
 $("clearChat").addEventListener("click", () => {
+  chat.innerHTML = "";
   conversation = [];
-  localStorage.removeItem(HISTORY_NAME);
-  showSavedConversation();
-  $("activity").textContent = "CHAT MEMORY CLEARED";
+
+  addMessage("Chat cleared. I am ready.");
+
+  setActivity("SYSTEM READY");
 });
 
-// Network status
-function updateNetwork() {
-  setStatus(
-    "networkStatus",
-    navigator.onLine ? "ONLINE" : "OFFLINE",
-    navigator.onLine
-  );
-}
+/* VOICE INPUT */
 
-window.addEventListener("online", updateNetwork);
-window.addEventListener("offline", updateNetwork);
-updateNetwork();
-
-// Voice input, when supported by the browser
-const SpeechRecognition =
+const Recognition =
   window.SpeechRecognition ||
   window.webkitSpeechRecognition;
 
-if (SpeechRecognition) {
-  const recognition = new SpeechRecognition();
+if (Recognition) {
+  const recognition = new Recognition();
+
   recognition.lang = "en-IN";
   recognition.continuous = false;
-  recognition.interimResults = false;
 
-  setStatus("voiceStatus", "AVAILABLE", true);
+  voiceStatus.textContent = "AVAILABLE";
 
   $("voiceButton").addEventListener("click", () => {
     try {
       recognition.start();
-    } catch {
-      $("activity").textContent =
-        "VOICE IS ALREADY LISTENING";
+      setActivity("LISTENING...");
+    } catch (error) {
+      setActivity("VOICE ALREADY ACTIVE");
     }
   });
-
-  recognition.onstart = () => {
-    $("voiceButton").classList.add("listening");
-    $("activity").textContent = "LISTENING...";
-  };
 
   recognition.onresult = event => {
     messageInput.value =
       event.results[0][0].transcript;
+
     sendMessage();
   };
 
-  recognition.onerror = event => {
-    $("activity").textContent =
-      "VOICE ERROR: " + event.error;
-  };
-
-  recognition.onend = () => {
-    $("voiceButton").classList.remove("listening");
+  recognition.onerror = () => {
+    setActivity("VOICE INPUT ERROR");
   };
 
 } else {
-  setStatus("voiceStatus", "NOT SUPPORTED");
+  voiceStatus.textContent = "UNAVAILABLE";
 }
 
+/* STARTUP */
+
+window.addEventListener("load", async () => {
+  status(networkStatus, "ONLINE", true);
+
+  if (Recognition && voiceStatus) {
+    voiceStatus.textContent = "AVAILABLE";
+  } else if (voiceStatus) {
+    voiceStatus.textContent = "UNAVAILABLE";
+  }
+
+  if (getKey()) {
+    apiKeyInput.value = getKey();
+
+    keyMessage.textContent = "Checking saved API key...";
+
+    await testConnection();
+
+  } else {
+    status(brainStatus, "NOT CONNECTED", false);
+
+    keyMessage.textContent = "API key not saved yet.";
+  }
+});
